@@ -9,7 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, CheckCircle2, AlertCircle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { addVoiceToRegistry, removeVoiceFromRegistry } from "@/lib/voiceRegistry";
 import { useVoiceMetadata } from "@/hooks/useVoiceMetadata";
 import { fetchManifestFromUri, isWalrusUri } from "@/lib/walrus";
 
@@ -113,8 +112,6 @@ export function VoiceRegistrationForm({ autoName = "", autoModelUri = "" }: Voic
     });
 
     if (result?.success) {
-      addVoiceToRegistry(address, formData.name);
-
       setFormData({
         name: "",
         modelUri: "",
@@ -160,8 +157,6 @@ export function VoiceRegistrationForm({ autoName = "", autoModelUri = "" }: Voic
     const result = await unregisterVoice(existingVoice.objectId);
 
     if (result?.success) {
-      removeVoiceFromRegistry(address);
-
       if (existingVoice.modelUri && (existingVoice.modelUri.startsWith("walrus://") || existingVoice.modelUri.startsWith("walrus://"))) {
         try {
           toast.info("Deleting voice bundle from storage...");

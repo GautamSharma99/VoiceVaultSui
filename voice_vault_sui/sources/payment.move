@@ -1,14 +1,30 @@
 module voice_vault_sui::payment {
 
     use sui::coin::{Self, Coin};
-    use sui::tx_context::TxContext;
     use sui::event;
 
     const PLATFORM_FEE_BPS: u64 = 250;
     const ROYALTY_BPS: u64 = 1000;
     const DENOM: u64 = 10000;
 
-    /// Events (replacement for Aptos EventHandle)
+    // ── On-chain license object ───────────────────────────────────────────────
+
+    /// Proof-of-purchase minted to the buyer on every successful payment.
+    /// The backend verifies ownership of this object instead of trusting its DB.
+    public struct LicensePass has key, store {
+        id: UID,
+        voice_id: ID,    // VoiceIdentity object ID that was licensed
+        buyer: address,
+        issued_at: u64,
+    }
+
+    // ── Events ────────────────────────────────────────────────────────────────
+
+    public struct LicenseIssued has copy, drop {
+        voice_id: ID,
+        buyer: address,
+    }
+
     public struct PaymentReceived has copy, drop {
         from: address,
         to: address,
@@ -27,8 +43,13 @@ module voice_vault_sui::payment {
         amount: u64
     }
 
+    // ── Payment functions ─────────────────────────────────────────────────────
+
+    /// Split payment among platform, royalty recipient, and creator, then mint
+    /// a LicensePass and transfer it to the buyer.
     public fun pay_with_royalty_split<T>(
         mut payment: Coin<T>,
+        voice_id: ID,
         creator: address,
         platform: address,
         royalty_recipient: address,
@@ -50,7 +71,18 @@ module voice_vault_sui::payment {
         transfer::public_transfer(royalty_coin, royalty_recipient);
         transfer::public_transfer(payment, creator);
 
-        /// Emit events
+        // Mint LicensePass and send to buyer — backend verifies this instead of
+        // trusting centralised DB logic.
+        let license = LicensePass {
+            id: object::new(ctx),
+            voice_id,
+            buyer: sender,
+            issued_at: 0,
+        };
+        transfer::public_transfer(license, sender);
+
+        event::emit(LicenseIssued { voice_id, buyer: sender });
+
         event::emit(PlatformFeePaid {
             payer: sender,
             platform,
@@ -97,4 +129,9 @@ module voice_vault_sui::payment {
 
         (platform_fee, royalty, creator_amount)
     }
+
+    // ── View helpers ──────────────────────────────────────────────────────────
+
+    public fun license_voice_id(pass: &LicensePass): ID { pass.voice_id }
+    public fun license_buyer(pass: &LicensePass): address { pass.buyer }
 }

@@ -6,6 +6,7 @@ import { CONTRACTS, suiToMist, calculatePaymentBreakdown } from "@/lib/contracts
 import { toast } from "sonner";
 
 export interface PaymentOptions {
+  voiceId: string;      // VoiceIdentity object ID — used to mint the on-chain LicensePass
   creatorAddress: string;
   amount: number; // in SUI
   royaltyRecipient?: string;
@@ -29,7 +30,7 @@ export function usePayForInference() {
       return null;
     }
 
-    const { creatorAddress, amount, royaltyRecipient, onSuccess, onError } = options;
+    const { voiceId, creatorAddress, amount, royaltyRecipient, onSuccess, onError } = options;
 
     setIsPaying(true);
 
@@ -53,12 +54,14 @@ export function usePayForInference() {
       // Create a coin with the exact balance needed for payment
       const paymentCoin = coinWithBalance({ balance: BigInt(amountInMist) });
 
-      // Call payment::pay_with_royalty_split with SUI coin type
+      // Call payment::pay_with_royalty_split — passes voiceId so the contract mints
+      // a LicensePass to the buyer, which the backend verifies instead of DB logic.
       tx.moveCall({
         target: `${CONTRACTS.PACKAGE_ID}::${CONTRACTS.PAYMENT.module}::pay_with_royalty_split`,
         typeArguments: ["0x2::sui::SUI"],
         arguments: [
           paymentCoin,
+          tx.pure.address(voiceId), // ID is BCS-compatible with address (32 bytes)
           tx.pure.address(creatorAddress),
           tx.pure.address(CONTRACTS.PLATFORM_ADDRESS),
           tx.pure.address(royaltyRecipient || creatorAddress),

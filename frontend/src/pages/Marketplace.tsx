@@ -8,7 +8,7 @@ import { VoiceMetadata } from "@/hooks/useVoiceMetadata";
 import { useVoicesWithWalrusMetadata } from "@/hooks/useVoicesWithWalrusMetadata";
 import { VoiceMarketplaceCard } from "@/components/voice/VoiceMarketplaceCard";
 import { toast } from "sonner";
-import { getVoiceAddresses } from "@/lib/voiceRegistry";
+import { useGlobalRegistry } from "@/hooks/useGlobalRegistry";
 import { useSuiWallet } from "@/hooks/useSuiWallet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { InfoIcon } from "lucide-react";
@@ -24,25 +24,17 @@ const Marketplace = () => {
   const { address } = useSuiWallet();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("trending");
-  const [voiceAddresses, setVoiceAddresses] = useState<string[]>([]);
 
-  // Load voice addresses from localStorage registry
-  // Note: These are addresses that have registered voices on-chain
-  // The actual voice metadata is fetched from Sui (on-chain) and Walrus metadata blobs.
-  // In the future, we could query blockchain events to discover all registered voices
-  useEffect(() => {
-    const addresses = getVoiceAddresses();
-    setVoiceAddresses(addresses);
-  }, []);
+  // Load voice owner addresses from the on-chain global VoiceRegistry shared object
+  const { voiceOwners, isLoading: isLoadingRegistry, refetch } = useGlobalRegistry();
 
   // Fetch voices with metadata from both Sui (on-chain) and Walrus manifests.
   // Sui provides: owner, price, rights, modelUri
   // Walrus provides: name, description, preview audio
-  const { voices: enrichedVoices, isLoading: isLoadingVoices } = useVoicesWithWalrusMetadata(voiceAddresses);
+  const { voices: enrichedVoices, isLoading: isLoadingVoices } = useVoicesWithWalrusMetadata(voiceOwners);
   
-  // Only show voices registered on-chain (no mock data)
   const voices = enrichedVoices;
-  const isLoading = isLoadingVoices;
+  const isLoading = isLoadingRegistry || isLoadingVoices;
 
   const handlePurchaseSuccess = async (voice: VoiceMetadata, txHash: string) => {
     // Track purchased voice in localStorage
@@ -112,18 +104,12 @@ const Marketplace = () => {
                   className="pl-12 h-12 bg-card border-border"
                 />
               </div>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="h-12"
                 onClick={() => {
-                  const addresses = getVoiceAddresses();
-                  // Create new array reference to trigger re-fetch
-                  setVoiceAddresses([...addresses]);
-                  if (addresses.length > 0) {
-                    toast.info(`Refreshed: Found ${addresses.length} registered voice${addresses.length !== 1 ? 's' : ''} in registry`);
-                  } else {
-                    toast.info("No registered voices found. Register a voice on the Upload page to see it here.");
-                  }
+                  refetch();
+                  toast.info("Refreshing registry from blockchain...");
                 }}
                 disabled={isLoading}
               >

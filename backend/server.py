@@ -66,6 +66,7 @@ async def tts_generate(request: Request):
         model_uri = data.get("modelUri")
         text = data.get("text")
         requester_account = data.get("requesterAccount")
+        voice_object_id = data.get("voiceObjectId")  # VoiceIdentity object ID on Sui
 
         if not model_uri:
             return JSONResponse({"error": "modelUri parameter missing"}, status_code=400)
@@ -76,12 +77,23 @@ async def tts_generate(request: Request):
             if not requester_account:
                 return JSONResponse({"error": "requesterAccount required for Walrus URIs"}, status_code=400)
 
-            has_access = walrus_module.verify_walrus_access(model_uri, requester_account)
-            if not has_access:
-                return JSONResponse({
-                    "error": "Access denied",
-                    "message": "You must purchase this voice from the marketplace to use it.",
-                }, status_code=403)
+            # Check 1: voice owner always has access
+            is_owner = walrus_module.verify_walrus_access(model_uri, requester_account)
+
+            if not is_owner:
+                # Check 2: buyer must present proof-of-purchase (on-chain LicensePass)
+                if not voice_object_id:
+                    return JSONResponse({
+                        "error": "Access denied",
+                        "message": "Purchase this voice on the marketplace to use it.",
+                    }, status_code=403)
+
+                has_license = walrus_module.verify_license_pass(voice_object_id, requester_account)
+                if not has_license:
+                    return JSONResponse({
+                        "error": "Access denied",
+                        "message": "No valid LicensePass found. Purchase the voice first.",
+                    }, status_code=403)
 
             embedding_buffer, config_buffer, preview_buffer = _download_preview_from_walrus(model_uri)
 

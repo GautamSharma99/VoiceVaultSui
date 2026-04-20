@@ -370,17 +370,63 @@ def get_manifest_preview_url(manifest: Dict[str, object]) -> Optional[str]:
 
 
 def verify_walrus_access(uri: str, requester_account: str) -> bool:
-    """
-    Placeholder access control that keeps the existing app behavior:
-    owners always have access and marketplace purchases are enforced elsewhere.
-    """
+    """Owner-only fast path — kept for legacy callers. Use verify_license_pass for buyers."""
     try:
         manifest = load_manifest(parse_walrus_uri(uri))
         owner = str(manifest.get("owner", ""))
-        if owner and requester_account and owner.lower() == requester_account.lower():
-            return True
-        return True
+        return bool(owner and requester_account and owner.lower() == requester_account.lower())
     except Exception:
+        return False
+
+
+def verify_license_pass(voice_object_id: str, requester_account: str) -> bool:
+    """
+    Query the Sui RPC to check whether `requester_account` owns a LicensePass
+    for `voice_object_id`.  Returns True only when a matching pass is found.
+    """
+    rpc_url = os.getenv("SUI_RPC_URL", "https://fullnode.testnet.sui.io")
+    package_id = os.getenv("SUI_PACKAGE_ID", "").strip()
+
+    if not package_id or not voice_object_id or not requester_account:
+        return False
+
+    struct_type = f"{package_id}::payment::LicensePass"
+
+    try:
+        response = httpx.post(
+            rpc_url,
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "suix_getOwnedObjects",
+                "params": [
+                    requester_account,
+                    {
+                        "filter": {"StructType": struct_type},
+                        "options": {"showContent": True},
+                    },
+                ],
+            },
+            timeout=10,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        objects = (data.get("result") or {}).get("data") or []
+        for obj in objects:
+            content = ((obj.get("data") or {}).get("content")) or {}
+            if content.get("dataType") != "moveObject":
+                continue
+            fields = content.get("fields") or {}
+            # Sui serialises ID as a plain hex string or {"id": "0x..."}
+            raw_vid = fields.get("voice_id")
+            if isinstance(raw_vid, dict):
+                raw_vid = raw_vid.get("id") or raw_vid.get("bytes") or ""
+            if raw_vid and str(raw_vid).lower() == voice_object_id.lower():
+                return True
+        return False
+    except Exception as err:
+        print(f"[verify_license_pass] Sui RPC error: {err}")
         return False
 
 

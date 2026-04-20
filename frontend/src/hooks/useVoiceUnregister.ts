@@ -34,6 +34,7 @@ export function useVoiceUnregister() {
       tx.moveCall({
         target: `${CONTRACTS.PACKAGE_ID}::${CONTRACTS.VOICE_IDENTITY.module}::delete_voice`,
         arguments: [
+          tx.object(CONTRACTS.VOICE_REGISTRY_ID),
           tx.object(voiceObjectId),
         ],
       });

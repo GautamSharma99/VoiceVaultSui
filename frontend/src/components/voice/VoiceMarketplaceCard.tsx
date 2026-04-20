@@ -65,9 +65,10 @@ export function VoiceMarketplaceCard({ voice, onPaymentSuccess }: VoiceMarketpla
     setShowPaymentDialog(false);
 
     const result = await payForInference({
+      voiceId: voice.objectId,       // VoiceIdentity object ID → minted into LicensePass
       creatorAddress: voice.owner,
       amount: price,
-      royaltyRecipient: voice.owner, // Can be different if there's an original creator
+      royaltyRecipient: voice.owner,
       onSuccess: (txHash) => {
         if (onPaymentSuccess) {
           onPaymentSuccess(txHash, voice);
