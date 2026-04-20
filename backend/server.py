@@ -15,6 +15,8 @@ load_dotenv(dotenv_path=BACKEND_DIR.parent / ".env")
 
 import voice_model
 import walrus as walrus_module
+import agent_store
+import livekit_service
 
 # Ensure storage directories exist
 walrus_module._ensure_storage_dirs()
@@ -393,6 +395,123 @@ async def walrus_delete(request: Request):
     except Exception as err:
         print(f"[API] Walrus delete error: {err}")
         return JSONResponse({"error": "Walrus delete failed", "message": str(err)}, status_code=500)
+
+
+# ==================== Agent Deploy API ====================
+
+@app.post("/api/agent/create")
+async def agent_create(request: Request):
+    try:
+        data = await request.json()
+        owner = data.get("owner")
+        if not owner:
+            return JSONResponse({"error": "owner is required"}, status_code=400)
+
+        config = {
+            "agent_name":    data.get("agentName", "My Agent"),
+            "template_id":   data.get("templateId", "custom"),
+            "system_prompt": data.get("systemPrompt", "You are a helpful assistant."),
+            "llm_provider":  data.get("llmProvider", "gpt-4o"),
+            "price_per_call":float(data.get("pricePerCall", 0.1)),
+            "voice_name":    data.get("voiceName", ""),
+            "voice_uri":     data.get("voiceUri", ""),
+            "voice_id":      data.get("voiceId", ""),
+        }
+
+        agent = agent_store.create_agent(owner, config)
+        return {"success": True, "agent": agent}
+    except Exception as err:
+        return JSONResponse({"error": str(err)}, status_code=500)
+
+
+@app.get("/api/agent/list")
+async def agent_list(owner: str):
+    try:
+        agents = agent_store.list_agents(owner)
+        return {"agents": agents}
+    except Exception as err:
+        return JSONResponse({"error": str(err)}, status_code=500)
+
+
+@app.get("/api/agent/{agent_id}")
+async def agent_get(agent_id: str):
+    agent = agent_store.get_agent(agent_id)
+    if not agent:
+        return JSONResponse({"error": "Agent not found"}, status_code=404)
+    return {"agent": agent}
+
+
+@app.post("/api/agent/deploy/{agent_id}")
+async def agent_deploy(agent_id: str):
+    try:
+        agent = agent_store.get_agent(agent_id)
+        if not agent:
+            return JSONResponse({"error": "Agent not found"}, status_code=404)
+
+        room_name = agent["room_name"]
+        user_token = livekit_service.create_token(room_name, "user")
+        join_url   = livekit_service.get_join_url(room_name, user_token)
+        start_cmd  = livekit_service.agent_start_command(room_name)
+
+        agent_store.update_agent(agent_id, {"status": "live"})
+
+        return {
+            "success":   True,
+            "roomName":  room_name,
+            "joinUrl":   join_url,
+            "userToken": user_token,
+            "startCmd":  start_cmd,
+            "liveKitConfigured": livekit_service.is_configured(),
+        }
+    except Exception as err:
+        return JSONResponse({"error": str(err)}, status_code=500)
+
+
+@app.post("/api/agent/pause/{agent_id}")
+async def agent_pause(agent_id: str):
+    updated = agent_store.update_agent(agent_id, {"status": "paused"})
+    if not updated:
+        return JSONResponse({"error": "Agent not found"}, status_code=404)
+    return {"success": True, "agent": updated}
+
+
+@app.post("/api/agent/resume/{agent_id}")
+async def agent_resume(agent_id: str):
+    updated = agent_store.update_agent(agent_id, {"status": "live"})
+    if not updated:
+        return JSONResponse({"error": "Agent not found"}, status_code=404)
+    return {"success": True, "agent": updated}
+
+
+@app.delete("/api/agent/{agent_id}")
+async def agent_delete(agent_id: str):
+    deleted = agent_store.delete_agent(agent_id)
+    if not deleted:
+        return JSONResponse({"error": "Agent not found"}, status_code=404)
+    return {"success": True}
+
+
+@app.post("/api/agent/join/{agent_id}")
+async def agent_join(agent_id: str, request: Request):
+    try:
+        data = await request.json()
+        participant = data.get("participantName", "user")
+        agent = agent_store.get_agent(agent_id)
+        if not agent:
+            return JSONResponse({"error": "Agent not found"}, status_code=404)
+
+        room_name  = agent["room_name"]
+        user_token = livekit_service.create_token(room_name, participant)
+        join_url   = livekit_service.get_join_url(room_name, user_token)
+
+        return {
+            "roomName":  room_name,
+            "token":     user_token,
+            "joinUrl":   join_url,
+            "liveKitConfigured": livekit_service.is_configured(),
+        }
+    except Exception as err:
+        return JSONResponse({"error": str(err)}, status_code=500)
 
 
 if __name__ == "__main__":

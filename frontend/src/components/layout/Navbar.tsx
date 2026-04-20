@@ -6,8 +6,9 @@ import { ConnectButton, useCurrentAccount, useSuiClient } from "@mysten/dapp-kit
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/marketplace", label: "Marketplace" },
-  { href: "/dashboard", label: "Dashboard" },
+  { href: "/deploy", label: "Deploy Agent" },
   { href: "/upload", label: "Create Voice" },
+  { href: "/dashboard", label: "Dashboard" },
 ];
 
 export function Navbar() {

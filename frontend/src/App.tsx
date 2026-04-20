@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Marketplace from "./pages/Marketplace";
 import Dashboard from "./pages/Dashboard";
 import Upload from "./pages/Upload";
+import Deploy from "./pages/Deploy";
 import Docs from "./pages/Docs";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
@@ -42,6 +43,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Upload />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/deploy"
+              element={
+                <ProtectedRoute>
+                  <Deploy />
                 </ProtectedRoute>
               }
             />
