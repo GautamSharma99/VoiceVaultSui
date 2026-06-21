@@ -71,6 +71,27 @@ def _content_type_for(filename: str) -> str:
     return "application/octet-stream"
 
 
+def _has_walrus_bundle_access(
+    uri: str,
+    requester_account: str,
+    voice_object_id: str | None = None,
+    purchase_tx_hash: str | None = None,
+    creator_address: str | None = None,
+) -> bool:
+    if walrus_module.verify_walrus_access(uri, requester_account):
+        return True
+    if voice_object_id and walrus_module.verify_license_pass(voice_object_id, requester_account):
+        return True
+    if purchase_tx_hash and creator_address:
+        return walrus_module.verify_purchase_transaction(
+            purchase_tx_hash,
+            requester_account,
+            creator_address,
+            voice_object_id or "",
+        )
+    return False
+
+
 def _pick(data: dict, *keys: str, default=None):
     for key in keys:
         if key in data and data[key] is not None:
@@ -683,12 +704,21 @@ async def walrus_download(request: Request):
         uri = data.get("uri")
         filename = data.get("filename")
         requester_account = data.get("requesterAccount")
+        voice_object_id = data.get("voiceObjectId")
+        purchase_tx_hash = data.get("purchaseTxHash")
+        creator_address = data.get("creatorAddress")
 
         if not uri or not filename:
             return JSONResponse({"error": "URI and filename are required"}, status_code=400)
 
         if requester_account:
-            has_access = walrus_module.verify_walrus_access(uri, requester_account)
+            has_access = _has_walrus_bundle_access(
+                uri,
+                requester_account,
+                voice_object_id,
+                purchase_tx_hash,
+                creator_address,
+            )
             if not has_access:
                 return JSONResponse({"error": "Access denied"}, status_code=403)
 
@@ -772,12 +802,21 @@ async def walrus_download(request: Request):
         uri = data.get("uri")
         filename = data.get("filename")
         requester_account = data.get("requesterAccount")
+        voice_object_id = data.get("voiceObjectId")
+        purchase_tx_hash = data.get("purchaseTxHash")
+        creator_address = data.get("creatorAddress")
 
         if not uri or not filename:
             return JSONResponse({"error": "URI and filename are required"}, status_code=400)
 
         if requester_account:
-            has_access = walrus_module.verify_walrus_access(uri, requester_account)
+            has_access = _has_walrus_bundle_access(
+                uri,
+                requester_account,
+                voice_object_id,
+                purchase_tx_hash,
+                creator_address,
+            )
             if not has_access:
                 return JSONResponse({"error": "Access denied"}, status_code=403)
 
