@@ -1,331 +1,258 @@
-# VoiceVault
+# VoiceVault Sui
 
-**Own Your Voice. Deploy Your Agent. Earn Forever.**
+VoiceVault is a Web3 voice marketplace and agent platform on Sui. Creators can process a voice sample, store the generated bundle on Walrus, register the voice on-chain, sell access through the marketplace, and deploy LiveKit voice agents.
 
-VoiceVault is a decentralized Web3 platform for creating, owning, and monetizing AI voice models on the Sui blockchain. Users can train custom AI voice models, mint on-chain ownership NFTs, deploy autonomous voice agents powered by LiveKit, and earn crypto every time someone uses their voice. It bridges the gap between voice creators and consumers through a transparent, decentralized marketplace with cryptographic proof of rights and automated payment distribution.
+The current runtime uses:
 
-![License](https://img.shields.io/badge/license-MIT-blue)
-![Status](https://img.shields.io/badge/status-active-brightgreen)
+- Sui Move contracts for voice identity, payments, and license/pass checks
+- Walrus for voice bundle storage
+- FastAPI backend for Walrus access, TTS, LiveKit, and agent APIs
+- React/Vite frontend for marketplace, upload, purchase, deploy, and call flows
+- Murf TTS through the backend for generated speech
 
----
+## Features
 
-## 🌟 Features
+- Register voice identities on Sui
+- Store voice bundles on Walrus
+- Discover registered voices from the marketplace
+- Buy voices and track purchased access in the app
+- Generate TTS from purchased voices after backend access verification
+- Deploy voice agents backed by LiveKit
+- Let deployed agents call/invite other deployed agents into the same room
+- Keep invited agents in-room while the previous agent stays muted/silent
+- Use readable agent names in LiveKit instead of raw generated IDs
 
-### Voice Ownership
-- **Voice Registration** — Train and register custom AI voice models on-chain as NFTs
-- **Global Registry** — On-chain `VoiceRegistry` shared object makes all voices globally discoverable (no localStorage dependency)
-- **Voice Marketplace** — Browse, search, and license voices from creators worldwide
-- **On-chain License Pass** — Purchasing a voice mints a `LicensePass` object to your wallet; backend verifies it instead of trusting internal DB logic
+## Project Structure
 
-### Agent Deployment (`/deploy`)
-- **4-step wizard** — Voice → Template → Configure → Deploy
-- **5 agent templates** — Sales Agent, Support Agent, Tutor Agent, Creator Clone, Custom
-- **LLM choice** — GPT-4o, Claude 3.5 Sonnet, Gemini 1.5 Pro, Groq Llama 3
-- **Pay-per-call pricing** — Set a SUI price per call; payment split handled on-chain
-- **LiveKit integration** — Generates a voice room and agent worker start command on deploy
-- **Agent dashboard** — See all deployed agents, live/paused status, call count, earnings
+```text
+VoiceVaultSui/
+  backend/
+    server.py                 FastAPI server
+    agent_worker.py           LiveKit agent worker
+    livekit_service.py        LiveKit token/room helpers
+    walrus.py                 Walrus storage and Sui access checks
+    voice_model.py            Voice bundle generation
+    storage/                  Local runtime storage
+  frontend/
+    src/
+      pages/
+        Upload.tsx            Voice processing, registration, purchased voice TTS
+        Marketplace.tsx       Voice discovery and purchase
+        Deploy.tsx            Agent deployment
+      lib/
+        api.ts                Backend API client
+        murfVoice.ts          Murf-backed TTS wrapper
+        paymentContract.ts    Payment transaction helper
+        voiceContract.ts      Voice contract transaction helper
+        purchasedVoices.ts    Local purchased voice cache
+  voice_vault_sui/
+    sources/                  Move contracts
+  docs/
+```
 
-### Payments & Access Control
-- **Royalty split** — Every payment automatically splits: 2.5% platform fee, 10% royalty, remainder to creator
-- **On-chain access verification** — Backend queries Sui RPC for `LicensePass` ownership; no permissive placeholder logic
-- **Revenue tracking** — Creator earnings visible in the dashboard
+## Prerequisites
 
----
+- Node.js 18+
+- Python 3.10+
+- Sui wallet browser extension
+- Sui CLI if you are publishing contracts
+- LiveKit account for voice agent calls
+- Murf API key for TTS generation
 
-## 🏗️ Tech Stack
+## Environment
 
-### Frontend
-- **Framework**: React 18 + TypeScript
-- **Bundler**: Vite
-- **Styling**: Tailwind CSS
-- **UI Components**: shadcn/ui + Radix UI
-- **Web3**: `@mysten/sui`, `@mysten/dapp-kit`
-- **State**: React Context + TanStack Query
-- **Charts**: Recharts
+Use separate env files for frontend and backend.
 
 ### Backend
-- **Language**: Python 3.8+
-- **API Framework**: FastAPI + Uvicorn
-- **Storage**: Walrus (content-addressed blob storage)
-- **Voice runtime**: LiveKit Agents (`livekit-api`)
-- **Agent store**: JSON-backed flat file store (`storage/agents.json`)
 
-### Blockchain
-- **Language**: Move 2024
-- **Network**: Sui testnet / mainnet
-- **Modules**: `voice_identity`, `payment`, `agent_identity`
+Create `backend/.env` from `backend/.env.example`.
 
----
-
-## 📋 Prerequisites
-
-- **Node.js** 18+
-- **Python** 3.8+
-- **Sui CLI** (for contract deployment)
-- **Sui Wallet** browser extension
-- **LiveKit account** (optional — required for live voice rooms)
-
----
-
-## 🚀 Installation
-
-### 1. Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev          # http://localhost:5173
-```
-
-### 2. Backend
-
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate      # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-python server.py              # http://localhost:8000
-```
-
-### 3. Smart Contracts
-
-```bash
-cd voice_vault_sui
-sui client publish --gas-budget 50000000
-```
-
-After publishing, copy the **Package ID** and the **VoiceRegistry shared object ID** from the output into `.env`.
-
----
-
-## ⚙️ Environment Variables
-
-Copy `.env` at the project root and fill in your values:
+Required for core backend:
 
 ```env
-# ── Sui ──────────────────────────────────────────────
+PORT=8000
+BACKEND_URL=http://localhost:8000
+
 SUI_NETWORK=testnet
 SUI_RPC_URL=https://fullnode.testnet.sui.io
-SUI_PACKAGE_ID=0x<your_package_id>
-SUI_VOICE_REGISTRY_ID=0x<registry_shared_object_id>
+SUI_FULL_NODE_URL=https://fullnode.testnet.sui.io:443
+SUI_PACKAGE_ID=0x...
+SUI_VOICE_REGISTRY_ID=0x...
 
-# ── Frontend (Vite) ───────────────────────────────────
-VITE_SUI_PACKAGE_ID=0x<your_package_id>
-VITE_SUI_VOICE_REGISTRY_ID=0x<registry_shared_object_id>
-VITE_API_URL=http://localhost:8000
-
-# ── Walrus ────────────────────────────────────────────
-WALRUS_STORAGE_MODE=local          # or "remote"
+WALRUS_STORAGE_MODE=local
 WALRUS_PUBLISHER_URL=https://publisher.walrus-testnet.walrus.space
+WALRUS_AGGREGATOR_URL=http://localhost:8000/api/walrus
+WALRUS_EPOCHS=5
+WALRUS_DELETABLE=true
+WALRUS_MAX_BLOB_SIZE=10485760
+```
 
-# ── LiveKit (required for live voice agent rooms) ─────
-# Get credentials at https://cloud.livekit.io
+Required for purchased voice TTS:
+
+```env
+MURF_API_KEY=your_murf_api_key
+MURF_VOICE_ID=Ken
+MURF_LOCALE=en-US
+MURF_FORMAT=WAV
+MURF_SAMPLE_RATE=44100
+```
+
+Required for deployed voice agents:
+
+```env
 LIVEKIT_URL=wss://your-project.livekit.cloud
 LIVEKIT_API_KEY=your_livekit_api_key
 LIVEKIT_API_SECRET=your_livekit_api_secret
-
-# ── LLM providers (used by the agent worker) ──────────
 OPENAI_API_KEY=your_openai_api_key
-ANTHROPIC_API_KEY=your_anthropic_api_key
 ```
 
----
+Do not put `MURF_API_KEY` in `frontend/.env`. The backend calls Murf so the key is not exposed in browser bundles.
 
-## 📁 Project Structure
+### Frontend
 
-```
-VoiceVaultSui/
-├── frontend/
-│   └── src/
-│       ├── pages/
-│       │   ├── Index.tsx          Landing page
-│       │   ├── Marketplace.tsx    Voice discovery & purchase
-│       │   ├── Upload.tsx         Voice model processing & registration
-│       │   ├── Deploy.tsx         Agent deployment wizard + dashboard
-│       │   └── Dashboard.tsx      Creator earnings & analytics
-│       ├── hooks/
-│       │   ├── useVoiceMetadata.ts
-│       │   ├── useGlobalRegistry.ts   On-chain registry query
-│       │   ├── useVoiceRegister.ts
-│       │   ├── useVoiceUnregister.ts
-│       │   └── usePayForInference.ts  Payment + LicensePass mint
-│       └── lib/
-│           ├── contracts.ts       Package ID, registry ID, fee constants
-│           ├── agentApi.ts        Agent CRUD + deploy API client
-│           ├── voiceRegistry.ts   (legacy — superseded by on-chain registry)
-│           ├── purchasedVoices.ts Local cache of purchased voices
-│           └── walrus.ts          Walrus manifest fetch helpers
-│
-├── backend/
-│   ├── server.py          FastAPI app + all routes
-│   ├── agent_store.py     JSON-backed agent store
-│   ├── livekit_service.py LiveKit token generation
-│   ├── walrus.py          Walrus storage + verify_license_pass()
-│   ├── voice_model.py     Voice embedding + bundle generation
-│   └── storage/
-│       ├── walrus/        Local Walrus blob store
-│       └── agents.json    Deployed agent configs
-│
-├── voice_vault_sui/
-│   └── sources/
-│       ├── voice_identity.move   VoiceIdentity NFT + VoiceRegistry
-│       ├── payment.move          Royalty split + LicensePass mint
-│       └── agent_identity.move   AgentIdentity on-chain object
-│
-└── docs/
+Create `frontend/.env` from `frontend/.env.example`.
+
+```env
+VITE_API_URL=http://localhost:8000
+VITE_PROXY_URL=http://localhost:8000
+VITE_BACKEND_URL=http://localhost:8000
+
+VITE_SUI_NETWORK=testnet
+VITE_SUI_RPC_URL=https://fullnode.testnet.sui.io
+VITE_SUI_PACKAGE_ID=0x...
+VITE_SUI_VOICE_REGISTRY_ID=0x...
+
+VITE_WALRUS_AGGREGATOR_URL=http://localhost:8000/api/walrus
 ```
 
----
+Only variables prefixed with `VITE_` should be used by the frontend.
 
-## 🎯 Usage
+## Install
 
-### Running the Application
+### Backend
 
-```bash
-# Terminal 1 — backend
-cd backend && python server.py
-
-# Terminal 2 — frontend
-cd frontend && npm run dev
+```powershell
+cd backend
+python -m venv venv
+.\venv\Scripts\activate
+pip install -r requirements.txt
+python server.py
 ```
 
-### Creating & Registering a Voice
+Backend runs on `http://localhost:8000`.
 
-1. Connect your Sui wallet
-2. Go to **Create Voice** (`/upload`)
-3. Record or upload a voice sample
-4. Process the model → uploads bundle to Walrus
-5. Register on-chain → mints a `VoiceIdentity` NFT to your wallet
-6. Your voice appears in the global marketplace immediately
+If port `8000` is already in use, stop the old server process or run the backend on another port and update the frontend API env values.
 
-### Purchasing a Voice
+### Frontend
 
-1. Browse **Marketplace** (`/marketplace`)
-2. Click **Buy Voice** on any listing
-3. Approve the SUI transaction — a `LicensePass` NFT is minted to your wallet
-4. Go to **Create Voice** → use the purchased voice for TTS generation
-
-### Deploying a Voice Agent
-
-1. Go to **Deploy Agent** (`/deploy`)
-2. **Step 1 — Voice**: Confirm your registered on-chain voice
-3. **Step 2 — Template**: Pick Sales Agent, Support Agent, Tutor, Creator Clone, or Custom
-4. **Step 3 — Configure**: Set agent name, system prompt, LLM provider, and price per call (SUI)
-5. **Step 4 — Deploy**: Review summary → click **Deploy Agent**
-6. Copy the displayed worker start command and run it in a terminal:
-
-```bash
-LIVEKIT_URL=wss://... LIVEKIT_API_KEY=... LIVEKIT_API_SECRET=... ROOM_NAME=vv-<id> python agent_worker.py dev
+```powershell
+cd frontend
+npm install
+npm run dev
 ```
 
-7. Click **Talk** on your agent card to open the live voice room
-8. Callers pay your configured SUI price per call, split on-chain automatically
+Frontend usually runs on `http://localhost:5173`.
 
----
+## Main Workflows
 
-## 🔐 Smart Contracts
+### Register a Voice
 
-### `voice_identity.move`
-- `VoiceRegistry` — shared object; all registered voice owners appended on every `register_voice` call
-- `VoiceIdentity` — owned NFT per creator with name, Walrus URI, rights, price
-- `register_voice(registry, ...)` — appends owner to global registry
-- `delete_voice(registry, ...)` — removes owner from registry
+1. Open `/upload`.
+2. Connect a Sui wallet.
+3. Record or upload an audio sample.
+4. Process the voice model.
+5. Register the generated Walrus URI on Sui.
+6. The voice becomes discoverable in `/marketplace`.
 
-### `payment.move`
-- `LicensePass` — owned NFT minted to the buyer on every successful purchase
-- `pay_with_royalty_split(payment, voice_id, ...)` — splits coins and mints `LicensePass` in a single transaction
-- Fee structure: **2.5% platform fee**, **10% royalty**, remainder to creator
+### Buy and Use a Voice
 
-### `agent_identity.move`
-- `AgentIdentity` — on-chain object linking a voice to a deployed agent config
-- `create_agent`, `pause_agent`, `resume_agent`, `delete_agent`
-- Emits `AgentCreated` event on deployment
+1. Open `/marketplace`.
+2. Buy a listed voice with Sui.
+3. Open `/upload`.
+4. Select the purchased voice under the TTS section.
+5. Enter text and generate speech.
 
----
+The backend verifies access before TTS. It accepts owner access, on-chain license access, and legacy purchase transaction proof where applicable.
 
-## 📡 API Reference
+### Murf TTS Notes
 
-### Voice
+Murf runtime TTS uses a Murf `voiceId`, configured with `MURF_VOICE_ID`. The default is `Ken`, a male voice.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/voice/process` | Process audio → generate embedding bundle → upload to Walrus |
-| POST | `/api/tts/generate` | Generate speech (owner or valid `LicensePass` required) |
-| POST | `/api/walrus/upload` | Upload a voice bundle to Walrus |
-| POST | `/api/walrus/download` | Download a file from a Walrus bundle |
-| POST | `/api/walrus/delete` | Delete a voice bundle (owner only) |
+Murf custom voice cloning is not an instant reference-audio cloning API. Murf's cloning product is an enterprise process where the custom voice is created by Murf and later exposed as a voice available to your account. After Murf gives you a custom voice ID, set:
 
-### Payments
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/payment/breakdown` | Calculate platform fee + royalty + creator split |
-
-### Agent Deploy
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/agent/create` | Create a new agent config |
-| GET | `/api/agent/list?owner=` | List all agents for an owner address |
-| GET | `/api/agent/:id` | Get a single agent |
-| POST | `/api/agent/deploy/:id` | Mark agent live, generate LiveKit room + token |
-| POST | `/api/agent/pause/:id` | Pause agent |
-| POST | `/api/agent/resume/:id` | Resume agent |
-| DELETE | `/api/agent/:id` | Delete agent |
-| POST | `/api/agent/join/:id` | Get a user token to join the agent's room |
-
----
-
-## 🏃 Development
-
-```bash
-# Frontend
-npm run dev          # Dev server
-npm run build        # Production build
-npm run lint         # ESLint
-npm run type-check   # TypeScript check
-
-# Backend
-python server.py     # Dev server (auto-reloads with uvicorn --reload)
+```env
+MURF_VOICE_ID=your_custom_murf_voice_id
 ```
 
----
+### Deploy a Voice Agent
 
-## 📦 Production Deployment
+1. Open `/deploy`.
+2. Select an owned voice.
+3. Choose an agent template.
+4. Configure prompt, provider, and pricing.
+5. Deploy the agent.
+6. Use the generated LiveKit room/call link to talk to it.
 
-```bash
-# Frontend
-cd frontend && npm run build     # outputs to dist/
+Agents can invite another deployed agent into the same LiveKit room when the conversation requires handoff or specialist support.
 
-# Backend
-pip install gunicorn
-gunicorn -w 4 -k uvicorn.workers.UvicornWorker server:app
+## API Overview
 
-# Or Docker
-docker build -t voicevault-backend ./backend
-docker run -p 8000:8000 --env-file .env voicevault-backend
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/voice/process` | Process uploaded audio into a voice bundle |
+| `POST` | `/api/walrus/upload` | Upload a voice bundle |
+| `POST` | `/api/walrus/download` | Download a file from a voice bundle |
+| `POST` | `/api/walrus/delete` | Delete a voice bundle |
+| `POST` | `/api/tts/generate` | Generate TTS after access checks |
+| `POST` | `/api/payment/breakdown` | Calculate payment split |
+| `POST` | `/api/agent/create` | Create an agent config |
+| `GET` | `/api/agent/list?owner=...` | List owner agents |
+| `POST` | `/api/agent/deploy/:id` | Deploy/start agent |
+| `POST` | `/api/agent/join/:id` | Get LiveKit room token |
+
+## Verification
+
+Common checks:
+
+```powershell
+cd frontend
+npm run build
 ```
 
----
+```powershell
+python -m py_compile backend\server.py backend\walrus.py
+```
 
-## 🤝 Contributing
+## Troubleshooting
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/your-feature`)
-3. Commit your changes
-4. Open a Pull Request
+### Backend cannot bind to port 8000
 
-Code style: ESLint for frontend, PEP 8 for backend, Move style guide for contracts.
+Another backend process is already running. Stop it or use a different port and update:
 
----
+```env
+VITE_API_URL=http://localhost:<port>
+VITE_PROXY_URL=http://localhost:<port>
+VITE_BACKEND_URL=http://localhost:<port>
+```
 
-## 📄 License
+### Murf key not working
 
-MIT — see [LICENSE](../LICENSE).
+Put the key in `backend/.env`:
 
-## 🔗 Links
+```env
+MURF_API_KEY=your_murf_api_key
+```
 
-- [Sui Documentation](https://docs.sui.io)
-- [Walrus](https://walrus.site)
-- [LiveKit Agents](https://github.com/livekit/agents)
-- [dApp Kit](https://github.com/MystenLabs/sui)
+Then restart `python server.py`.
+
+### Purchased voice does not appear in Upload
+
+Make sure the voice appears in `/marketplace`, purchase transaction succeeded, and the backend can download `meta.json` from the Walrus bundle.
+
+### Agent joins but does not speak
+
+Check backend logs, `backend/storage/agent_worker.log`, LiveKit credentials, and `OPENAI_API_KEY`.
+
+## License
+
+MIT
